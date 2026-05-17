@@ -4,7 +4,7 @@
 
 当前主线实现位于 `vega_agent/`。`baseline_3.py` 和 `main.py` 是兼容入口，真实逻辑已经拆分成企业级项目的模块。
 
-baseline_2.py、baseline_2.5.py是模块化前的测试版本。5 道（基础）/ 8 道（进阶）必答题的运行截图展示在outputs/vega_agent_chat_log.md文件中！
+baseline_2.py、baseline_2.5.py是模块化前的测试版本。5 道（基础）/ 8 道（进阶）必答题的运行截图展示在outputs/vega_agent_chat_log.md文件中！此外本项目使用gemini 3.1pro 和 gpt5.5 另外生成了20测试题并进行测试，见output/vega_agent_new_test_questions_with_answers.md
 
 ## 1. 环境运行方式
 
