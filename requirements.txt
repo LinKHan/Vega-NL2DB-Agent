@@ -1,0 +1,6 @@
+gradio
+openai
+psycopg2-binary
+pandas
+matplotlib
+tabulate

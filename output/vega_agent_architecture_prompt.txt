@@ -1,0 +1,168 @@
+Use case: infographic-diagram
+Asset type: enterprise architecture diagram for a Python NL2DB agent
+Primary request: Create a complete architecture diagram for the current "Vega Exchange NL2DB Agent V9" project in Chinese. The diagram should show how a natural-language business question is transformed into a safe single-database or multi-step SQL execution plan, then merged in Pandas and rendered as a final audited answer.
+
+Important project boundary:
+- This diagram is for the current main package: vega_agent.
+- Do not include vega_agent2.
+- Do not include FAISS, vector database, embedding retrieval, OpenAIEmbeddings, or any schema vector store.
+- Do not include a generic Pandas postprocess DSL / derived_columns pipeline. That design was rolled back.
+
+Canvas and style:
+- Wide 16:9 landscape architecture diagram.
+- Clean engineering presentation style, white or very light background.
+- Crisp vector-like boxes, thin directional connectors, clear layer grouping.
+- Chinese labels must be concise and readable.
+- Use restrained colors by layer:
+  - UI: light blue
+  - Core Agent: light purple
+  - Schema RAG: light green
+  - LLM: light orange
+  - DB/Security: light red
+  - Render/Output: light gray
+- No decorative characters, no mascot, no logo, no watermark.
+
+Required title:
+Vega Exchange NL2DB Agent V9 架构图
+
+High-level layout:
+- Left side: User and Gradio UI.
+- Center: Core Agent orchestration.
+- Upper center: Schema RAG and LLM prompt/model calls.
+- Lower center: SQL safety, DB runner, three isolated PostgreSQL databases.
+- Right side: Pandas merge, summary/chart/audit rendering, final Markdown answer.
+- Add a feedback loop from final result / agent_memory back to Planner.
+
+Required layers and nodes:
+
+1. 入口与 UI 层
+   - main.py / baseline_3.py: 兼容入口
+   - vega_agent/main.py: 启动 Gradio
+   - app_gradio.py: Web UI + 流式编排
+   - gr.State: chat_state
+   - gr.State: agent_memory
+   - Markdown 对话渲染
+   - transcript.py: 写入 outputs/vega_agent_chat_log.md
+
+2. Core Agent 层
+   - planner.py: 意图识别 + Schema RAG + Plan JSON 规范化
+   - builtin_plans.py: Q6/Q7/Q8 等确定性计划与高风险 benchmark 模板
+   - executor.py: 多 step 执行编排 + SQL 参数注入 + 自修复
+   - merger.py: Pandas 跨库合并
+   - memory.py: 多轮上下文、last_result_df、user_id/symbol 抽取
+
+3. Schema RAG 层（当前主线是轻量关键词/规则检索）
+   - catalog.py: 三库 Schema Registry + 字段解释 + 逻辑关系
+   - retriever.py: 关键词、字段名、业务规则打分
+   - formatter.py: Schema -> Prompt 文本
+   - Callout: 不是向量库检索，不使用 embedding
+
+4. LLM 层
+   - client.py: DashScope / OpenAI-compatible Client
+   - prompts.py:
+     - Planner System Prompt
+     - SQL Repair Prompt
+     - Summary Prompt
+   - Planner LLM Call: 生成 intent/query、多 step JSON、merge_strategy、join_keys、图表字段
+   - Repair LLM Call: PostgreSQL 普通执行错误后修复 SQL
+   - Optional Summary LLM Call: 默认关闭，可开启后只做事实摘要润色
+   - Runtime config:
+     - MODEL_NAME 默认 deepseek-v4-flash
+     - max_tokens
+     - timeout
+     - compact history
+
+5. DB 与安全层
+   - connections.py: DB_URIS + 数据时间锚点 DB_LATEST_DATE
+   - sql_guard.py:
+     - 只允许 SELECT / WITH ... SELECT
+     - 禁止写入、DDL、权限、危险函数、多语句、SQL 注释
+     - strip_current_db_prefix: 移除当前库前缀
+   - runner.py:
+     - read_sql_query
+     - 执行耗时
+     - infer_tables_from_sql
+   - Three isolated PostgreSQL databases:
+     - market_data: symbol, kline_1d
+     - trading: "user", "order", trade
+     - accounts: account, ledger
+   - Large warning callout:
+     - 禁止数据库层跨库 JOIN
+     - 每个 SQL step 只能连接一个数据库
+
+6. Pandas Agent 合并层
+   - merger.py deterministic strategies:
+     - q6_buy_at_high_days
+     - q7_holding_valuation_top10
+     - platform_asset_valuation
+     - q8_context_top_users_trading_profile
+     - q7_top10_with_trading_profile
+     - top_usdt_balance_order_profile
+     - trade_notional_vs_market_volume
+   - merge_auto_join:
+     - fallback for dynamic multi-step plans
+     - uses explicit join_keys first
+     - fallback keys: user_id / symbol / asset / trade_date / date / month
+     - supports join_type, sort_by, sort_ascending, limit
+   - Callout:
+     - 跨库分析只在 Agent / Pandas 层完成
+
+7. Render 层
+   - summary.py:
+     - generate_fast_summary: 本地确定性事实摘要
+     - LLM Summary 默认关闭
+     - 可选 LLM 润色必须通过数字事实校验
+     - SHOW_SUMMARY_TRACE 可展示摘要调试面板
+   - chart.py:
+     - Matplotlib
+     - BytesIO
+     - Base64
+     - Markdown 内嵌图表
+     - 折线图标注最高/最低点
+   - audit.py:
+     - 数据明细 Markdown 表格
+     - 来源审计
+     - DB 耗时 / Planner 耗时 / 摘要渲染耗时
+     - 数据时间锚点
+     - 每个 step 的 DB、表、行数、SQL
+
+8. Final Output
+   - 结论
+   - 摘要调试面板（可选）
+   - 数据明细表
+   - 图表
+   - 来源审计 SQL 面板
+   - 写入 outputs/vega_agent_chat_log.md
+
+Required data flow arrows:
+1. 用户问题 -> Gradio Web -> app_gradio.bot_response
+2. bot_response -> planner.agent_reasoning
+3. planner -> builtin_plans first
+4. if no builtin plan: planner -> schema.retriever -> schema.formatter -> prompts.build_planner_system_prompt -> LLM Plan JSON
+5. Plan JSON -> normalize_plan
+6. Each step -> executor.execute_step_with_repair
+7. SQL -> strip_current_db_prefix -> sql_guard.validate_readonly_sql -> db.runner.execute_sql_once
+8. DB Runner -> one isolated PostgreSQL database per step
+9. PostgreSQL error -> repair prompt -> LLM Repair -> SQL Guard -> DB Runner retry
+10. Step DataFrames -> merger.apply_merge_strategy
+11. Multi-step DataFrames -> deterministic merge strategy or merge_auto_join
+12. Final DataFrame -> summary.generate_summary_with_trace
+13. Final DataFrame -> chart.render_chart_markdown
+14. sources -> audit.format_audit
+15. Markdown answer -> Gradio Markdown
+16. Final DataFrame -> memory.update_agent_memory -> feedback loop to Planner for follow-up questions like "上面这 10 个用户"
+17. Final answer -> transcript.append_turn -> outputs/vega_agent_chat_log.md
+
+Important callouts:
+- 时间锚点基于 market_data.kline_1d 的 MAX(open_time)，不是现实日期
+- 当前业务锚点预期为 2024-12-31
+- 只读 SQL 安全护栏是硬拦截，安全错误不进入自修复
+- trading 库中的 user/order 是保留词，SQL 必须写成 "user" / "order"
+- 每个 SQL step 已连接到对应数据库，SQL 不应写 market_data.xxx / trading.xxx / accounts.xxx 前缀
+- 多轮上下文只把压缩后的历史、上一轮字段和实体传给 Planner，避免把图表 Base64 和长 SQL 全塞进 Prompt
+- 延迟优化：默认关闭 LLM Summary，使用本地事实摘要；Planner/Repair/Summary 分别设置 max_tokens 和 timeout
+- 当前主线 Schema RAG 是轻量关键词/规则检索，不是向量检索
+
+Text language:
+- All node labels and callouts should be in Chinese.
+- Use short labels inside boxes; put details in small callout notes.

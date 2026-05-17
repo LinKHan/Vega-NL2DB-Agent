@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  market_data:
+    image: postgres:16
+    container_name: pg_market_data
+    environment:
+      POSTGRES_DB: market_data
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+    ports: ["5433:5432"]
+    volumes:
+      - ./seed/market_data:/docker-entrypoint-initdb.d:ro
+
+  trading:
+    image: postgres:16
+    container_name: pg_trading
+    environment:
+      POSTGRES_DB: trading
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+    ports: ["5434:5432"]
+    volumes:
+      - ./seed/trading:/docker-entrypoint-initdb.d:ro
+
+  accounts:
+    image: postgres:16
+    container_name: pg_accounts
+    environment:
+      POSTGRES_DB: accounts
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+    ports: ["5435:5432"]
+    volumes:
+      - ./seed/accounts:/docker-entrypoint-initdb.d:ro
+
