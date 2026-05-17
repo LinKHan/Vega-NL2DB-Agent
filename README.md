@@ -353,22 +353,7 @@ vega_agent/
 - 内置计划结果是否与标准答案一致。
 - 跨库合并结果是否包含预期字段。
 
-### 4.8 GitHub 提交前需要脱敏和清理
 
-当前本地 `.env` 可能包含真实或看起来真实的 API Key。上传 GitHub 前必须：
-
-- 不提交 `.env`。
-- 使用 `.env.example` 放占位配置。
-- 清理 `__pycache__/`。
-- 视情况清理过大的聊天日志或 Base64 图表日志。
-
-建议增加 `.gitignore`：
-
-```gitignore
-.env
-.venv/
-__pycache__/
-*.pyc
 outputs/*.md
 ```
 
